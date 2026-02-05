@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", default=0, type=int)
     parser.add_argument("--save-model", action="store_true")        # Save model and optimizer parameters
     parser.add_argument('--tar_env_interact_interval', help='interval of interacting with target env', default=10, type=int)
-    parser.add_argument('--max_step', default=int(1e6), type=int)  # the maximum gradient step for off-dynamics rl learning
+    parser.add_argument('--max_step', default=int(4e5), type=int)  # the maximum gradient step for off-dynamics rl learning
     parser.add_argument('--params', default=None, help='Hyperparameters for the adopted algorithm, ought to be in JSON format')
     
     args = parser.parse_args()
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         domain = 'antmaze'
     else:
         raise NotImplementedError
-    print(domain)
+    print(f"Domain detected: {domain}")
 
     call_env = {
         'mujoco': call_mujoco_env,
@@ -213,6 +213,7 @@ if __name__ == "__main__":
         'tar_env_interact_interval': int(args.tar_env_interact_interval),
         'max_step': int(args.max_step),
         'shift_level': shift_level,
+        'task_name': src_env_name
     })
 
     policy = call_algo(args.policy, config, args.mode, device)

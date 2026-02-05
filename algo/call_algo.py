@@ -24,7 +24,7 @@ def call_algo(algo_name, config, mode, device):
 
     elif mode == 1:
         algo_name = algo_name.lower()
-        assert algo_name in ['cql_sac', 'bc_vgdf', 'bc_sac', 'h2o', 'mcq_sac', 'rlpd', 'bc_par']
+        assert algo_name in ['cql_sac', 'bc_vgdf', 'bc_sac', 'h2o', 'mcq_sac', 'rlpd', 'bc_par', 'vflow']
         # offline online setting
         from offline_online.cql_sac import CQLSAC
         from offline_online.bc_vgdf import BCVGDF
@@ -33,6 +33,7 @@ def call_algo(algo_name, config, mode, device):
         from offline_online.h2o import H2O
         from offline_online.rlpd import RLPD
         from offline_online.bc_par import BCPAR
+        from offline_online.vflow import VFlowPolicy
 
         algo_to_call = {
             'cql_sac': CQLSAC,
@@ -42,6 +43,7 @@ def call_algo(algo_name, config, mode, device):
             'h2o': H2O,
             'rlpd': RLPD,
             'bc_par': BCPAR,
+            'vflow': VFlowPolicy,
         }
 
         algo = algo_to_call[algo_name]

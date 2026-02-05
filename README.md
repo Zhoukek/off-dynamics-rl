@@ -45,6 +45,41 @@ Nevertheless, we totally understand that some users may still need the detailed 
 conda create -n offdynamics python=3.8.13 && conda activate offdynamics
 pip install setuptools==63.2.0
 pip install wheel==0.38.4
+pip install pip==0.24.0
+pip install torch==1.11.0+cu113 torchaudio==0.11.0+cu113 torchvision==0.12.0+cu113 --index-url https://download.pytorch.org/whl/cu113
+conda install -c conda-forge box2d-py==2.3.8
+conda install -c conda-forge mesalib glew glfw
+
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+mkdir -p $CONDA_PREFIX/etc/conda/deactivate.d
+
+vim $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+# 写入
+#!/bin/sh
+# 保存原始变量以便退出环境时恢复
+export OLD_CPATH=$CPATH
+export OLD_LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+
+# 设置 MuJoCo 和编译路径
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/zkx/.mujoco/mujoco210/bin:$CONDA_PREFIX/lib:/usr/lib/nvidia
+export CPATH=$CONDA_PREFIX/include:$CPATH
+export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
+export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
+export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
+
+vim $CONDA_PREFIX/etc/conda/deactivate.d/env_vars.sh
+# 写入
+#!/bin/sh
+export CPATH=$OLD_CPATH
+export LD_LIBRARY_PATH=$OLD_LD_LIBRARY_PATH
+unset C_INCLUDE_PATH
+unset CPLUS_INCLUDE_PATH
+unset LIBRARY_PATH
+
+conda install -c conda-forge patchelf
+pip install POT==0.9.3
+pip install einops torchdiffeq
+
 pip install -r requirement.txt
 ```
 
