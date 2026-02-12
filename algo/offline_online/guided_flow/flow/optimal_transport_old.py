@@ -130,19 +130,52 @@ class OTPlanSampler:
             if torch.isfinite(maxv) and maxv > 0:
                 M = M / maxv
 
-        P = self.ot_fn(a, b, M.detach().cpu().numpy())
+        # P = self.ot_fn(a, b, M.detach().cpu().numpy())
+    
+        # if not np.all(np.isfinite(P)):
+        #     print("ERROR: OT plan contains non-finite values.")
+        #     print("Cost mean, max:", float(M.mean()), float(M.max()))
+        #     if self.warn:
+        #         warnings.warn("Non-finite OT plan; reverting to uniform.")
+        #     P = np.ones_like(P) / P.size
 
-        if not np.all(np.isfinite(P)):
+        # if abs(P.sum()) < 1e-12:
+        #     if self.warn:
+        #         warnings.warn("Degenerate OT plan; reverting to uniform.")
+        #     P = np.ones_like(P) / P.size
+
+        # use sinkhorn
+        # a, b -> GPU torch
+        a_tensor = torch.from_numpy(a).cuda() if isinstance(a, np.ndarray) else a.cuda()
+        b_tensor = torch.from_numpy(b).cuda() if isinstance(b, np.ndarray) else b.cuda()
+        # 确保数据类型一致
+        a_tensor = a_tensor.float()  # 转换为 float32
+        b_tensor = b_tensor.float()
+        M = M.float()
+
+        # Sinkhorn OT (GPU, torch)
+        P = self.ot_fn(a_tensor, b_tensor, M)   # torch.Tensor on GPU
+
+        # ---------- 数值稳定性检查（torch 里完成） ----------
+        if not torch.isfinite(P).all():
             print("ERROR: OT plan contains non-finite values.")
             print("Cost mean, max:", float(M.mean()), float(M.max()))
             if self.warn:
                 warnings.warn("Non-finite OT plan; reverting to uniform.")
-            P = np.ones_like(P) / P.size
 
-        if abs(P.sum()) < 1e-12:
+            P = torch.ones_like(P)
+            P = P / P.numel()
+
+        # ---------- 退化解检查 ----------
+        if torch.abs(P.sum()) < 1e-12:
             if self.warn:
                 warnings.warn("Degenerate OT plan; reverting to uniform.")
-            P = np.ones_like(P) / P.size
+
+            P = torch.ones_like(P)
+            P = P / P.numel()
+
+        # ---------- 最后一步：转回 numpy ----------
+        P = P.detach().cpu().numpy()
 
         return P
 

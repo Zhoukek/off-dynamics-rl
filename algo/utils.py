@@ -46,6 +46,16 @@ class ReplayBuffer(object):
             torch.FloatTensor(self.not_done[ind]).to(self.device)
         )
     
+    def sample_all(self):
+        ind = np.random.randint(0, self.size, size=self.size)
+        return (
+            torch.FloatTensor(self.state[ind]),
+            torch.FloatTensor(self.action[ind]),
+            torch.FloatTensor(self.next_state[ind]),
+            torch.FloatTensor(self.reward[ind]),
+            torch.FloatTensor(self.not_done[ind])
+        )
+    
     def convert_D4RL(self, dataset):
         self.state = dataset['observations']
         self.action = dataset['actions']

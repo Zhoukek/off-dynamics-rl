@@ -744,8 +744,8 @@ class FlowMatching:
                 ### compute the running time needed for sampling the location and conditional flow
                 sample_time = time.time()
                 ### this is the time for the adaptation flow
-                t, ns_t, ut = self.CFM_adaptation.sample_location_and_conditional_flow_condtion_version(ns_src_pred_norm_adapt, ns_b_norm_adapt, s_b_norm_adapt, s_b_norm_adapt, a_b_norm_adapt, a_b_norm_adapt, t)
-                sample_time = time.time() - sample_time
+                t, ns_t, ut = self.CFM_adaptation.sample_location_and_conditional_flow_condition_version(ns_src_pred_norm_adapt, ns_b_norm_adapt, s_b_norm_adapt, s_b_norm_adapt, a_b_norm_adapt, a_b_norm_adapt, t)
+                sample_time = time.time() - sample_time 
                 #print(f"Time needed for sampling the location and conditional flow: {sample_time:.2f}s")
 
                 # Condition for adaptation model: Use SOURCE normalized s, a

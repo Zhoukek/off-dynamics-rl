@@ -442,9 +442,8 @@ class VFlowPolicy(object):
         """Trains/adapts the dynamics model to the target data using Flow Matching."""
         # Ensure FlowMatching class has this method implemented correctly
         print(f"Starting Adaptation Flow Matching Training (Iteration {self.total_it})...")
-        try:
-            # Pass necessary parameters from config
-             self.dynamics_model.train_adaptation_flow_matching(
+                    # Pass necessary parameters from config
+        self.dynamics_model.train_adaptation_flow_matching(
                 tar_replay_buffer, # Use target buffer for adaptation
                 holdout_ratio=self.config.get('flow_matching_holdout_ratio', 0.1),
                 n_epochs=self.config.get('flow_matching_training_max_epochs_adaptation', 20), # Typically fewer epochs for adaptation
@@ -452,11 +451,21 @@ class VFlowPolicy(object):
                 lr=self.config.get('flow_matching_lr', 1e-4), # Potentially use a smaller LR for adaptation
                 eta=self.config.get('flow_matching_eta', 0.0)
             )
-             print(f"Adaptation Flow Matching Finished.")
-        except AttributeError:
-             print("[Error] `train_adaptation_flow_matching` method not found in FlowMatching class.")
-        except Exception as e:
-             print(f"[Error] Exception during adaptation flow training: {e}")
+        # try:
+        #     # Pass necessary parameters from config
+        #      self.dynamics_model.train_adaptation_flow_matching(
+        #         tar_replay_buffer, # Use target buffer for adaptation
+        #         holdout_ratio=self.config.get('flow_matching_holdout_ratio', 0.1),
+        #         n_epochs=self.config.get('flow_matching_training_max_epochs_adaptation', 20), # Typically fewer epochs for adaptation
+        #         batch_size=self.config.get('flow_matching_batch_size', 1024),
+        #         lr=self.config.get('flow_matching_lr', 1e-4), # Potentially use a smaller LR for adaptation
+        #         eta=self.config.get('flow_matching_eta', 0.0)
+        #     )
+        #      print(f"Adaptation Flow Matching Finished.")
+        # except AttributeError:
+        #      print("[Error] `train_adaptation_flow_matching` method not found in FlowMatching class.")
+        # except Exception as e:
+        #      print(f"[Error] Exception during adaptation flow training: {e}")
 
 
     def train(self, src_replay_buffer, tar_replay_buffer, batch_size=128, writer=None):

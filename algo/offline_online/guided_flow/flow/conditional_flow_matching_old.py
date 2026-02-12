@@ -232,7 +232,9 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
         ot_sampler: exact OT method to draw couplings (x0, x1) (see Eq.(17) [1]).
         """
         super().__init__(sigma)
-        self.ot_sampler = OTPlanSampler(method="exact")
+        # self.ot_sampler = OTPlanSampler(method="exact")
+        self.ot_sampler = OTPlanSampler(method="sinkhorn")
+
 
     def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
         r"""

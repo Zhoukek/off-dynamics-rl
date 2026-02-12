@@ -21,22 +21,52 @@ from envs.antmaze.call_antmaze_env        import call_antmaze_env
 from envs.infos                           import get_normalized_score
 from tensorboardX                         import SummaryWriter
 
+# set your wandb api key here if you want to use wandb for logging
+import wandb
+from datetime import datetime
+import os
+os.environ['WANDB_API_KEY'] = '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'
+
+import sys
+disable_wandb = False
+if sys.gettrace() is not None:  # 检查是否在debugger中
+    disable_wandb = True
+    print("Debugger detected, wandb disabled")
+
 
 def eval_policy(policy, env, eval_episodes=10, eval_cnt=None):
+    """Evaluates the policy."""
     eval_env = env
-
     avg_reward = 0.
-    for episode_idx in range(eval_episodes):
-        state, done = eval_env.reset(), False
-        while not done:
-            action = policy.select_action(np.array(state))
-            next_state, reward, done, _ = eval_env.step(action)
+    avg_ep_len = 0.
+    try:
+        for episode_idx in range(eval_episodes):
+            state, done = eval_env.reset(), False
+            ep_reward = 0.
+            ep_len = 0
+            max_steps = getattr(eval_env, '_max_episode_steps', 1000) # Get max steps if available
+            while not done:
+                action = policy.select_action(np.array(state), test=True) # Use test=True for deterministic eval
+                next_state, reward, done, info = eval_env.step(action)
 
-            avg_reward += reward
-            state = next_state
+                ep_reward += reward
+                state = next_state
+                ep_len += 1
+                if ep_len >= max_steps: # Ensure termination if env doesn't handle it
+                    done = True
+            avg_reward += ep_reward
+            avg_ep_len += ep_len
+    except Exception as e:
+        print(f"[Error] Exception during policy evaluation: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0.0 # Return 0 or handle error appropriately
+
     avg_reward /= eval_episodes
+    avg_ep_len /= eval_episodes
 
-    print("[{}] Evaluation over {} episodes: {}".format(eval_cnt, eval_episodes, avg_reward))
+    eval_id = f"Eval-{eval_cnt}" if eval_cnt is not None else "Evaluation"
+    print(f"[{eval_id}] Avg Reward over {eval_episodes} episodes: {avg_reward:.3f} (Avg Ep Len: {avg_ep_len:.1f})")
 
     return avg_reward
 
@@ -57,6 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--save-model", action="store_true")        # Save model and optimizer parameters
     parser.add_argument('--tar_env_interact_interval', help='interval of interacting with target env', default=10, type=int)
     parser.add_argument('--max_step', default=int(4e5), type=int)  # the maximum gradient step for off-dynamics rl learning
+    parser.add_argument('--eval_freq', default=int(5e3), type=int, help="Evaluation frequency (gradient steps)")
     parser.add_argument('--params', default=None, help='Hyperparameters for the adopted algorithm, ought to be in JSON format')
     
     args = parser.parse_args()
@@ -227,6 +258,58 @@ if __name__ == "__main__":
     src_replay_buffer = utils.ReplayBuffer(state_dim, action_dim, device)
     tar_replay_buffer = utils.ReplayBuffer(state_dim, action_dim, device)
 
+    # --- Weights & Biases Initialization ---
+    # Initialize wandb to None first, attempt to init, and proceed if it fails
+    wandb_instance = None
+
+    # --- Create Output Directory and Logger ---
+    config_to_save = config.copy()
+    config_to_save['device'] = str(config['device']) 
+    config_str = json.dumps(config_to_save, sort_keys=True)
+
+    # Construct descriptive directory name
+    run_name_parts = [args.policy, args.env]
+    run_name_parts.append(f"src_{args.srctype}")
+
+    run_name_parts.append(f"shift_level_{args.shift_level}")
+    if config.get("extreme_shift", False):
+        run_name_parts.append("extreme")
+    run_name_parts.append(f"seed{args.seed}")
+    run_name = "-".join(run_name_parts)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_name = f"{run_name}_{timestamp}"
+
+
+
+    try:
+        wandb_run_name = run_name # Use the descriptive run name generated earlier
+        if hasattr(policy, 'total_it') and policy.total_it > 0: # If loaded a checkpoint
+             wandb_run_name = f"resume_{run_name}"
+        if config.get("extreme_shift", False):
+            group = f"{args.env}-{args.srctype}-{args.shift_level}-extreme-True"
+        else:
+            group = f"{args.env}-{args.srctype}-{args.shift_level}"
+        if not disable_wandb:
+            wandb_instance = wandb.init(
+                project="off-dynamics-rl", # Replace with your project name
+                entity="zhoukek-zhejiang-university", # Replace with your wandb entity (username or team) or leave as None for default
+                name=wandb_run_name,
+                config=config, # Log the final config
+                dir=outdir, # Save wandb files within the run directory
+                resume="allow", # Allow resuming if run_id matches
+                id=run_name, # Use base run name as ID for potential resume
+                group=group,
+            )
+            print("Weights & Biases initialized successfully.")
+
+        else:
+            print("[debugger] Wandb logging disabled.")
+
+    except Exception as e:
+        print(f"Line 465: [Error] Failed to initialize Weights & Biases: {e}")
+        print("[Warning] Wandb logging disabled.")
+        # wandb_instance remains None
+
     # in case that the domain is offline, we directly load its offline data
     if args.mode == 1 or args.mode == 3:
         src_replay_buffer.convert_D4RL(d4rl.qlearning_dataset(src_eval_env))
@@ -241,8 +324,33 @@ if __name__ == "__main__":
 
     eval_cnt = 0
     
-    eval_src_return = eval_policy(policy, src_eval_env, eval_cnt=eval_cnt)
-    eval_tar_return = eval_policy(policy, tar_eval_env, eval_cnt=eval_cnt)
+    # eval_src_return = eval_policy(policy, src_eval_env, eval_cnt=eval_cnt)
+    # eval_tar_return = eval_policy(policy, tar_eval_env, eval_cnt=eval_cnt)
+
+        # --- Initial Policy Evaluation ---
+    eval_cnt = 0
+    start_step = 0
+    # Only evaluate if not resuming from a later step, or always evaluate?
+    # Let's always evaluate the current policy state
+    print("\n--- Initial Evaluation (Before Training Loop Starts/Resumes) ---")
+    if src_eval_env:
+        init_src_eval_return = eval_policy(policy, src_eval_env, eval_cnt=f"InitSrc-{start_step}")
+        writer.add_scalar('eval/source_return', init_src_eval_return, global_step=start_step)
+        if not disable_wandb:
+            if wandb_instance: wandb_instance.log({'eval/source_return': init_src_eval_return}, step=start_step)
+    # eval_cnt += 1 # Not really used later, maybe remove
+    if tar_eval_env:
+        init_tar_eval_return = eval_policy(policy, tar_eval_env, eval_cnt=f"InitTar-{start_step}")
+        init_eval_normalized_score = get_normalized_score(init_tar_eval_return, ref_env_name)
+        writer.add_scalar('eval/target_return', init_tar_eval_return, global_step=start_step)
+        writer.add_scalar('eval/target_normalized_score', init_eval_normalized_score, global_step=start_step)
+        if not disable_wandb:
+            if wandb_instance: wandb_instance.log({
+                'eval/target_return': init_tar_eval_return,
+                'eval/target_normalized_score': init_eval_normalized_score
+            }, step=start_step)
+    print("-------------------------------------------------------------\n")
+
     eval_cnt += 1
 
     if args.mode == 0:
@@ -354,6 +462,12 @@ if __name__ == "__main__":
                 writer.add_scalar('train/target return', tar_episode_reward, global_step = t+1)
                 train_normalized_score = get_normalized_score(tar_episode_reward, ref_env_name)
                 writer.add_scalar('train/target normalized score', train_normalized_score, global_step = t+1)
+                if not disable_wandb:
+                    if wandb_instance: 
+                        wandb_instance.log({
+                            'train/target_return': tar_episode_reward,
+                            'train/target_normalized_score': train_normalized_score,
+                        }, step=t+1)
 
                 tar_state, tar_done = tar_env.reset(), False
                 tar_episode_reward = 0
@@ -367,8 +481,23 @@ if __name__ == "__main__":
                 writer.add_scalar('test/target return', tar_eval_return, global_step = t+1)
                 eval_normalized_score = get_normalized_score(tar_eval_return, ref_env_name)
                 writer.add_scalar('test/target normalized score', eval_normalized_score, global_step = t+1)
+                if not disable_wandb:
+                    if wandb_instance: wandb_instance.log({
+                            'test/source_return': src_eval_return,
+                            'test/target_return': tar_eval_return,
+                            'test/target_normalized_score': eval_normalized_score,
+                        }, step=t+1)   
 
                 eval_cnt += 1
+
+                if (t + 1) == 400000:
+                    tar_eval_return = eval_policy(policy, tar_eval_env, eval_cnt=f"Step{t+1}-Tar")
+                    eval_normalized_score = get_normalized_score(tar_eval_return, ref_env_name)
+                    if not disable_wandb:
+                        if wandb_instance: wandb_instance.log({
+                            'test/target_return_400K': tar_eval_return,
+                            'test/target_normalized_score_400K': eval_normalized_score,
+                        })    
 
                 if args.save_model:
                     policy.save('{}/models/model'.format(outdir))
